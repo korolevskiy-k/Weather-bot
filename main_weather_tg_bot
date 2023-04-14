@@ -1,0 +1,58 @@
+import datetime
+import requests
+from config import tg_bot_token, open_weather_token
+from aiogram import Bot, Dispatcher, executor, types
+
+bot = Bot(token=tg_bot_token)
+dp = Dispatcher(bot)
+
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    await message.reply("Привет! Я Оляша - метеоролог \U00002665\nОтправь мне название города, а я тебе дам сводку погоды)")
+
+@dp.message_handler()
+async def get_weather(message: types.Message):
+    code_to_smile = {
+        "Clear": "Ясно \U00002600",
+        "Clouds": "Облачно \U00002601",
+        "Rain": "Дождь \U00002614",
+        "Drizzle": "Дождь \U00002614",
+        "Thunder": "Гроза \U000026A1",
+        "Snow": "Снег \U0001F328",
+        "Mist": "Туман \U0001F32B"
+    }
+    try:
+        r = requests.get(
+            f"https://api.openweathermap.org/data/2.5/weather?q={message.text}&appid={open_weather_token}&units=metric"
+        )
+        data = r.json()
+        # pprint(data) # все данные
+
+        # Наши отобранные данные
+        city = data['name']  # Название города из данных
+        cur_weather = data['main']['temp']  # Температура
+        humidity = data['main']['humidity']  # Влажность
+        pressure = data['main']['pressure']  # Давление
+        wind_speed = data['wind']['speed']  # Скорость ветра
+        sunrise_timestamp = datetime.datetime.fromtimestamp(data['sys']['sunrise'])  # Время рассвета
+        sunset_timestamp = datetime.datetime.fromtimestamp(data['sys']['sunset'])  # Время заката
+        length_of_the_day = sunset_timestamp - sunrise_timestamp  # Продолжительность дня
+        weather_description = data['weather'][0]['main']  # Описание погоды
+        if weather_description in code_to_smile:
+            wd = code_to_smile[weather_description]
+        else:
+            wd = "Лучше посмотреть в окно"
+
+        # Вывод в консоль
+        await message.reply(f"***{datetime.datetime.now().strftime('%Y-%m-%d %H-%M')}***\n\n"
+              f'Погода в городе: {city}\nТемпература: {cur_weather}С° {wd}\nВлажность: {humidity}\n'
+              f'Давление: {pressure} мм.рт.ст\nСкорость ветра: {wind_speed} м/с\nВремя рассвета: {sunrise_timestamp}\n'
+              f'Время заката: {sunset_timestamp}\nПродолжительность дня: {length_of_the_day}\n\n'
+              f'***Хорошего дня!***')
+    # Обработка ошибок
+    except:
+        await message.reply('\U00002620 Введите корректное название города \U00002620')
+
+
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)
